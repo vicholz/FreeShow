@@ -1,22 +1,15 @@
 import { defineConfig } from "vite"
 import { svelte } from "@sveltejs/vite-plugin-svelte"
-import sveltePreprocess from "svelte-preprocess"
 
 const production = process.env.NODE_ENV === "production"
 
 export default defineConfig({
     plugins: [
         svelte({
-            preprocess: sveltePreprocess({
-                typescript: {
-                    tsconfigFile: "config/typescript/tsconfig.svelte.json"
-                }
-            }),
             compilerOptions: {
                 dev: !production
             },
             onwarn: (warning, handler) => {
-                // disable A11y warnings
                 if (warning.code.startsWith("a11y-")) return
                 handler(warning)
             }

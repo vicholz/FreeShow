@@ -1,6 +1,6 @@
 <script lang="ts">
     import { uid } from "uid"
-    import { Item } from "../../../../types/Show"
+    import type { Item } from "../../../../types/Show"
     import type { StageItem } from "../../../../types/Stage"
     import { activeStage, dictionary, labelsDisabled, selected, stageShows, timers } from "../../../stores"
     import { translateText } from "../../../utils/language"

@@ -6,7 +6,7 @@ import { isOutputWindow } from "../utils/common"
 import { send } from "../utils/request"
 import { AudioAnalyserMerger } from "./audioAnalyserMerger"
 import { connectAudioSourceToEqualizer, disconnectAudioSourceFromEqualizer, getConnectedSourceOutput, initializeEqualizer, setAutoInitializeCallback } from "./audioEqualizer"
-import { AudioMultichannel, MultichannelInfo } from "./audioMultichannel"
+import { AudioMultichannel, type MultichannelInfo } from "./audioMultichannel"
 import { AudioPlayer } from "./audioPlayer"
 
 export class AudioAnalyser {

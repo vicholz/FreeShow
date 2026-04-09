@@ -4,7 +4,7 @@
         "es2021": true,
         "node": true
     },
-    "extends": ["plugin:@typescript-eslint/recommended", "plugin:@typescript-eslint/recommended-requiring-type-checking", "prettier"],
+    "extends": ["plugin:@typescript-eslint/recommended", "plugin:@typescript-eslint/recommended-type-checked", "prettier"],
     "parser": "@typescript-eslint/parser",
     "parserOptions": {
         "project": "config/typescript/tsconfig.svelte.json",
@@ -20,7 +20,7 @@
                 "default": "array"
             }
         ],
-        "@typescript-eslint/ban-types": [
+        "@typescript-eslint/no-restricted-types": [
             "error",
             {
                 "types": {
@@ -66,14 +66,14 @@
             }
         ],
         "@typescript-eslint/no-empty-function": "error",
-        "@typescript-eslint/no-empty-interface": "error",
+        "@typescript-eslint/no-empty-object-type": "error",
         "@typescript-eslint/no-explicit-any": "off",
         "@typescript-eslint/no-misused-new": "error",
         "@typescript-eslint/no-namespace": "error",
-        "@typescript-eslint/no-parameter-properties": "off",
+        "@typescript-eslint/parameter-properties": "off",
         "@typescript-eslint/no-unused-expressions": "error",
         "@typescript-eslint/no-use-before-define": "off",
-        "@typescript-eslint/no-var-requires": "error",
+        "@typescript-eslint/no-require-imports": "error",
         "@typescript-eslint/prefer-for-of": "error",
         "@typescript-eslint/prefer-function-type": "error",
         "@typescript-eslint/prefer-namespace-keyword": "error",
@@ -85,7 +85,6 @@
         "@typescript-eslint/no-floating-promises": "off",
         "@typescript-eslint/no-misused-promises": "off",
         "@typescript-eslint/no-unused-vars": ["error", { "varsIgnorePattern": "^_", "argsIgnorePattern": "^_" }],
-        "--TEMPORARILY-DISABLED": "off",
         "@typescript-eslint/restrict-plus-operands": "off",
         "@typescript-eslint/no-non-null-assertion": "off",
         "@typescript-eslint/naming-convention": "off",

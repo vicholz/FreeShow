@@ -8,7 +8,7 @@
     import InputRow from "../input/InputRow.svelte"
     import MaterialDropdown from "../inputs/MaterialDropdown.svelte"
     import MaterialTextInput from "../inputs/MaterialTextInput.svelte"
-    import { API_emitter } from "./api"
+    import type { API_emitter } from "./api"
     import { formatData } from "./emitters"
     import MidiValues from "./MidiValues.svelte"
     import { uid } from "uid"

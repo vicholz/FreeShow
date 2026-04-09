@@ -4,7 +4,7 @@
         "es6": true,
         "node": true
     },
-    "extends": ["plugin:@typescript-eslint/recommended", "plugin:@typescript-eslint/recommended-requiring-type-checking", "prettier"],
+    "extends": ["plugin:@typescript-eslint/recommended", "plugin:@typescript-eslint/recommended-type-checked", "prettier"],
     "parser": "@typescript-eslint/parser",
     "parserOptions": {
         "project": "config/typescript/tsconfig.electron.json",
@@ -19,7 +19,7 @@
                 "default": "array"
             }
         ],
-        "@typescript-eslint/ban-types": [
+        "@typescript-eslint/no-restricted-types": [
             "error",
             {
                 "types": {
@@ -65,11 +65,11 @@
             }
         ],
         "@typescript-eslint/no-empty-function": "error",
-        "@typescript-eslint/no-empty-interface": "error",
+        "@typescript-eslint/no-empty-object-type": "error",
         "@typescript-eslint/no-explicit-any": "off",
         "@typescript-eslint/no-misused-new": "error",
         "@typescript-eslint/no-namespace": "error",
-        "@typescript-eslint/no-parameter-properties": "off",
+        "@typescript-eslint/parameter-properties": "off",
         "@typescript-eslint/no-unused-expressions": "error",
         "@typescript-eslint/no-use-before-define": "off",
         "@typescript-eslint/prefer-for-of": "error",
@@ -88,12 +88,11 @@
         "@typescript-eslint/type-annotation-spacing": "off",
         "@typescript-eslint/unified-signatures": "error",
         "@typescript-eslint/no-non-null-assertion": "off",
-        "@typescript-eslint/no-var-requires": "off",
+        "@typescript-eslint/no-require-imports": "off",
         "@typescript-eslint/no-misused-promises": "off",
         "@typescript-eslint/unbound-method": ["error", { "ignoreStatic": true }],
         "@typescript-eslint/naming-convention": "off",
         "@typescript-eslint/no-floating-promises": "off",
-        "--TEMPORARILY-DISABLED": "off",
         "@typescript-eslint/restrict-template-expressions": "off",
         "@typescript-eslint/no-unsafe-member-access": "off",
         "@typescript-eslint/no-unsafe-assignment": "off",

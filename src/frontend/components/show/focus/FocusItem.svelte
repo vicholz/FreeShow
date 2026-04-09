@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { ProjectShowRef } from "../../../../types/Projects"
+    import type { ProjectShowRef } from "../../../../types/Projects"
     import { showsCache } from "../../../stores"
     import AudioPreview from "../AudioPreview.svelte"
     import FolderShow from "../folder/FolderShow.svelte"

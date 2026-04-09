@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
-import sveltePreprocess from 'svelte-preprocess'
 import { resolve } from 'path'
 import { copyFileSync, mkdirSync, existsSync, readFileSync, createReadStream } from 'fs'
 
@@ -128,16 +127,10 @@ function copyServerFilesPlugin(serverId) {
 export default defineConfig({
   plugins: [
     svelte({
-      preprocess: sveltePreprocess({
-        typescript: serverConfig.typescript ? {
-          tsconfigFile: `./config/typescript/tsconfig.server${production ? '.prod' : ''}.json`,
-        } : false,
-      }),
       compilerOptions: {
         dev: !production,
       },
       onwarn: (warning, handler) => {
-        // disable A11y warnings
         if (warning.code.startsWith('a11y-')) return
         handler(warning)
       },
