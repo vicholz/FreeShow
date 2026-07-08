@@ -125,7 +125,10 @@
 
     $: if (id && !fadingOut && mounted) startReceiver()
     function startReceiver() {
-        const isStage = !!$outputs[outputId]?.stageOutput || !!Object.values($outputs)[0]?.stageOutput
+        // Prefer the specific outputId for this component instance.
+        // Fall back only to any stageOutput present if no specific id (defensive).
+        const thisOutput = $outputs[outputId]
+        const isStage = !!thisOutput?.stageOutput || Object.values($outputs).some((o: any) => o?.stageOutput)
         const shouldRegister = !(mirror && !isStage)
         if (!shouldRegister || receiving) return
 
@@ -221,7 +224,9 @@
 
     $: videoExists = !!video
     $: if ($currentWindow === "output" && videoExists) {
-        const isStageMirror = mirror && ($outputs[outputId]?.stageOutput || Object.values($outputs)[0]?.stageOutput)
+        const thisOutput = $outputs[outputId]
+        const hasStageOutput = !!thisOutput?.stageOutput || Object.values($outputs).some((o: any) => !!o?.stageOutput)
+        const isStageMirror = mirror && hasStageOutput
         if (!isStageMirror) analyseVideo()
     }
 

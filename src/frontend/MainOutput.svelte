@@ -3,7 +3,7 @@
     import { fade } from "svelte/transition"
     import { OUTPUT } from "../types/Channels"
     import type { Resolution } from "../types/Settings"
-    import { getResolution } from "./components/helpers/output"
+    import { getResolution, getWindowOutputId } from "./components/helpers/output"
     import Output from "./components/output/Output.svelte"
     import { getStyleResolution } from "./components/slide/getStyleResolution"
     import StageLayout from "./components/stage/StageLayout.svelte"
@@ -11,7 +11,7 @@
     import { hideDisplay } from "./utils/common"
     import { send } from "./utils/request"
 
-    $: outputId = Object.keys($outputs)[0]
+    $: outputId = getWindowOutputId() || Object.keys($outputs)[0] || ""
 
     // get output resolution
     let width = 0
@@ -41,7 +41,7 @@
 
 <div
     class="fill context #output_window"
-    style="flex-direction: {getStyleResolution(resolution, width, height, 'fit').includes('width') && !Object.values($outputs)[0]?.stageOutput ? 'row' : 'column'};"
+    style="flex-direction: {getStyleResolution(resolution, width, height, 'fit').includes('width') && !$outputs[outputId]?.stageOutput ? 'row' : 'column'};"
     class:hideCursor={$special.hideCursor}
     on:mousemove={mousemoveOutput}
     bind:offsetWidth={width}
