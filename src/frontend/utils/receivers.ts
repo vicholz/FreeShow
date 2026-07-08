@@ -8,6 +8,7 @@ import { setEqualizerEnabled, updateEqualizerBands } from "../audio/effects/audi
 import { runAction } from "../components/actions/actions"
 import { getDynamicValue } from "../components/edit/scripts/itemHelpers"
 import { clone } from "../components/helpers/array"
+import { getWindowOutputId } from "../components/helpers/output"
 import { checkNextAfterMedia } from "../components/helpers/showActions"
 import { clearBackground } from "../components/output/clear"
 import { receiveMainGlobal } from "../IPC/main"
@@ -291,9 +292,12 @@ export const receiveOUTPUTasOUTPUT: any = {
         const timeSinceSent = Date.now() - time
         if (timeSinceSent > 100) return // skip frames if overloaded
 
-        // WIP only receive the "output capture" from this outputs "stageOutput id"
-        // let outputId = Object.keys(get(outputs))[0]
-        // if (id !== outputId) return
+        // Only process capture for the relevant output for this window/stage.
+        const winId = getWindowOutputId()
+        if (winId && id !== winId) return
+        // Also respect stageOutput specific if set on the output
+        const out = get(outputs)[id] || get(allOutputs)[id]
+        if (out?.stageOutput && winId && id !== out.stageOutput) return
 
         previewBuffers.update((a) => {
             a[id] = { buffer, size }

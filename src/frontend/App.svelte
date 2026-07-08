@@ -20,6 +20,7 @@
     import Center from "./components/system/Center.svelte"
     import { activeProfile, activeTimers, closeAd, currentWindow, disabledServers, events, language, loaded, localeDirection, os, outputDisplay, outputs, profiles, theme, themes, timers } from "./stores"
     import { focusArea, logerror, mainClick, toggleRemoteStream } from "./utils/common"
+    import { getWindowOutputId } from "./components/helpers/output"
     import { keydown } from "./utils/shortcuts"
     import { startup } from "./utils/startup"
 
@@ -44,7 +45,7 @@
 
     // edge blending
     let blending = ""
-    $: if ($currentWindow === "output" && Object.values($outputs)[0]?.blending) blending = getBlending()
+    $: if ($currentWindow === "output" && (get(outputs)[getWindowOutputId()]?.blending || Object.values($outputs)[0]?.blending)) blending = getBlending()
 
     // set language direction
     $: document.documentElement.setAttribute("dir", $localeDirection)

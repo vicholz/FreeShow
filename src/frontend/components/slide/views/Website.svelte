@@ -2,6 +2,7 @@
     import { OUTPUT } from "../../../../types/Channels"
     import { currentWindow, outputs } from "../../../stores"
     import { send } from "../../../utils/request"
+    import { getWindowOutputId } from "../../helpers/output"
     import Icon from "../../helpers/Icon.svelte"
     import Button from "../../inputs/Button.svelte"
 
@@ -94,7 +95,7 @@
         if ($currentWindow !== "output") return
 
         // set focus on website
-        send(OUTPUT, ["FOCUS"], { id: Object.keys($outputs)[0] })
+        send(OUTPUT, ["FOCUS"], { id: getWindowOutputId() || Object.keys($outputs)[0] })
         setTimeout(() => webview?.focus())
     }
 

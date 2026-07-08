@@ -4,6 +4,7 @@ import { OUTPUT } from "../../types/Channels"
 import { clone } from "../components/helpers/array"
 import { audioChannels, outputs } from "../stores"
 import { isOutputWindow } from "../utils/common"
+import { getWindowOutputId } from "../components/helpers/output"
 import { send } from "../utils/request"
 import { AudioAnalyser } from "./audioAnalyser"
 import { AudioPlayer } from "./audioPlayer"
@@ -111,7 +112,7 @@ export class AudioAnalyserMerger {
         audioChannels.set(mergedChannels)
 
         if (isOutputWindow()) {
-            send(OUTPUT, ["AUDIO_MAIN"], { id: Object.keys(get(outputs))[0], channels: mergedChannels })
+            send(OUTPUT, ["AUDIO_MAIN"], { id: getWindowOutputId() || Object.keys(get(outputs))[0], channels: mergedChannels })
         }
     }
 

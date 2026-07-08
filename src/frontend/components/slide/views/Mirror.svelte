@@ -3,6 +3,7 @@
     import { OUTPUT } from "../../../../types/Channels"
     import { currentWindow, outputs, showsCache, stageShows } from "../../../stores"
     import { send } from "../../../utils/request"
+    import { getWindowOutputId } from "../../helpers/output"
     import { clone } from "../../helpers/array"
     import { loadShows } from "../../helpers/setShow"
     import { getLayoutRef } from "../../helpers/show"
@@ -68,7 +69,7 @@
     // request preview capture
     let previewRequestInterval: any = null
     $: if ($currentWindow === "output" && stageEnabled && $stageShows[item.mirror?.stage]?.items?.["output#current_output"]?.enabled) {
-        let id = Object.keys($outputs)[0]
+        let id = getWindowOutputId() || Object.keys($outputs)[0]
         let previewId = $stageShows[item.mirror?.stage]?.settings?.output
 
         previewRequestInterval = setInterval(() => {

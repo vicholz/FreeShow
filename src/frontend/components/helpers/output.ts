@@ -843,7 +843,7 @@ export function deleteOutput(outputId: string) {
         send(OUTPUT, ["REMOVE"], { id: outputId })
         delete a[outputId]
 
-        currentOutputSettings.set(Object.keys(a)[0])
+        currentOutputSettings.set(getWindowOutputId() || Object.keys(a)[0] || "")
         return a
     })
 }
@@ -1697,7 +1697,8 @@ export function getSlideFilter(slideData: SlideData | null) {
 }
 
 export function getBlending() {
-    const blending = Object.values(get(outputs))[0]?.blending
+    const outputsList = getActiveOutputs(get(outputs), false, true, true)
+    const blending = (outputsList.length ? get(outputs)[outputsList[0]]?.blending : null) || Object.values(get(outputs))[0]?.blending
     if (!blending) return ""
 
     if (!blending.left && !blending.right) return ""

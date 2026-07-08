@@ -25,6 +25,7 @@ import { audioExtensions, imageExtensions, videoExtensions } from "../values/ext
 import { drawerTabs } from "../values/tabs"
 import { activeShow } from "./../stores"
 import { hideDisplay, isOutputWindow, togglePanels, triggerFunction } from "./common"
+import { getWindowOutputId } from "../components/helpers/output"
 import { send } from "./request"
 import { save } from "./save"
 
@@ -138,7 +139,8 @@ export function keydown(e: KeyboardEvent) {
     if (e.key === "F4" && e.altKey) return
 
     if (isOutputWindow()) {
-        const currentOut = get(outputs)[Object.keys(get(outputs))[0]]?.out || {}
+        const winId = getWindowOutputId()
+        const currentOut = get(outputs)[winId || Object.keys(get(outputs))[0]]?.out || {}
         const contentDisplayed = currentOut.slide?.id || currentOut.background?.path || currentOut.background?.id || currentOut.overlays?.length
         if (e.key === "Escape" && !contentDisplayed) return hideDisplay()
 

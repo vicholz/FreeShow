@@ -1,4 +1,5 @@
 import { get } from "svelte/store"
+import { getWindowOutputId } from "./output"
 import { uid } from "uid"
 import { Main } from "../../../types/IPC/Main"
 import type { Clipboard } from "../../../types/Main"
@@ -1161,7 +1162,7 @@ const deleteActions = {
             history({ id: "UPDATE", newData: { id }, location: { page: "settings", id: "settings_output" } })
         })
 
-        currentOutputSettings.set(Object.keys(get(outputs))[0])
+        currentOutputSettings.set(getWindowOutputId() || Object.keys(get(outputs))[0])
     },
     profile: (data: any) => {
         data.forEach(({ id }) => {

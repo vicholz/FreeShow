@@ -3,6 +3,7 @@ import type { AudioChannel } from "../../types/Audio"
 import { AUDIO, OUTPUT } from "../../types/Channels"
 import { audioEffects, disabledServers, media, outputs, playingAudio, playingVideos, serverData, special, videosData } from "../stores"
 import { isOutputWindow } from "../utils/common"
+import { getActiveOutputs, getWindowOutputId } from "../components/helpers/output"
 import { send } from "../utils/request"
 import { AudioAnalyserMerger } from "./audioAnalyserMerger"
 import { AudioMultichannel, MultichannelInfo } from "./audioMultichannel"
@@ -199,7 +200,7 @@ export class AudioAnalyser {
         setTimeout(() => {
             if (!this.shouldAnalyse()) {
                 AudioAnalyserMerger.stop()
-                send(OUTPUT, ["AUDIO_MAIN"], { id: Object.keys(get(outputs))[0], stop: true })
+                send(OUTPUT, ["AUDIO_MAIN"], { id: getWindowOutputId() || Object.keys(get(outputs))[0], stop: true })
             }
         })
     }
@@ -437,7 +438,7 @@ export class AudioAnalyser {
         if (this.recorder || !this.recorderActive) return
         this.initDestination()
 
-        const id = isOutputWindow() ? Object.keys(get(outputs))[0] : "main"
+        const id = isOutputWindow() ? getWindowOutputId() : "main"
         // might only work in "main" for OutputShow
 
         try {
@@ -482,8 +483,11 @@ export class AudioAnalyser {
     }
 
     private static shouldBeActive() {
-        let outputList = Object.values(get(outputs))
-        if (isOutputWindow()) outputList = [Object.values(get(outputs))[0]]
+        let outputList = getActiveOutputs(get(outputs), false, true, true).map(id => get(outputs)[id]).filter(Boolean)
+        if (isOutputWindow()) {
+            const winId = getWindowOutputId()
+            outputList = winId ? [get(outputs)[winId]].filter(Boolean) : outputList
+        }
 
         // any outputs with webrtc streaming enabled
         if (outputList.find((a) => a && a.enabled && a.webrtc)) return true
