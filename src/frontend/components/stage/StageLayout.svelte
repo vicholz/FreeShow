@@ -124,11 +124,19 @@
     // $: videoTime = $videosTime[outputId] || 0
     // { $activeTimers, $variables, $playingAudio, $playingAudioPaths, videoTime }
     let conditionsUpdater = 0
-    const updaterInterval = setInterval(() => {
-        if (!Array.isArray(stageItems)) return
-        if (stageItems.some((a) => a?.conditions)) conditionsUpdater++
-    }, 500)
-    onDestroy(() => clearInterval(updaterInterval))
+    // Lightweight conditions tick only when there are conditional items (reduces idle work)
+    let conditionsInterval: any = null
+    $: if (Array.isArray(stageItems) && stageItems.some((a) => a?.conditions) && !conditionsInterval) {
+        conditionsInterval = setInterval(() => {
+            conditionsUpdater++
+        }, 500)
+    } else if ((!stageItems || !stageItems.some((a) => a?.conditions)) && conditionsInterval) {
+        clearInterval(conditionsInterval)
+        conditionsInterval = null
+    }
+    onDestroy(() => {
+        if (conditionsInterval) clearInterval(conditionsInterval)
+    })
 
     function checkVisibility(itemIndex: number, _updater: any) {
         const item = stageItems[itemIndex]

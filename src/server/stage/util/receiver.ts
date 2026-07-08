@@ -80,6 +80,17 @@ export const receiver = {
             return a
         })
     },
+
+    // Push-driven stream update (preferred over polling for current_output mirrors).
+    // Sent from main when previewBuffers update for outputs referenced by stage current_output items.
+    STREAM: (data: any) => {
+        if (!data?.stream) return
+        stream.update((a) => {
+            const key = data.alpha ? "alpha" : "default"
+            a[key] = data.stream
+            return a
+        })
+    },
     // REQUEST_VIDEO_DATA: (data: any) => {
     //     console.log(data)
 

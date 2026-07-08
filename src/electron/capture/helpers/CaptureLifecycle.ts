@@ -191,6 +191,9 @@ export class CaptureLifecycle {
         const channels = ["ndi", "blackmagic", "server", "stage", "webrtc"]
         channels.forEach((channel) => CaptureHelper.Transmitter.stopChannel(id, channel))
 
+        // Ensure stage mirror list is clean even if removeOutput wasn't called
+        CaptureHelper.Transmitter.stageWindows = CaptureHelper.Transmitter.stageWindows.filter((w) => w !== id)
+
         console.info("Capture - stopping: " + id)
 
         this.cleanupListeners(capture.window)

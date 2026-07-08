@@ -133,6 +133,10 @@ export class OutputLifecycle {
         NdiSender.stopSenderNDI(id)
         BlackmagicSender.stop(id)
 
+        // Clean up stage mirror tracking to prevent sending to destroyed windows
+        // and leaking the array over long app runs.
+        CaptureHelper.Transmitter.stageWindows = CaptureHelper.Transmitter.stageWindows.filter((w) => w !== id)
+
         const output = OutputHelper.getOutput(id)
         if (!output) return
 

@@ -61,7 +61,9 @@ import {
     transitionData,
     variables,
     variableTags,
-    volume
+    volume,
+    connections,
+    previewBuffers
 } from "../stores"
 import { hasNewerUpdate } from "./common"
 import { driveConnect } from "./drive"
@@ -239,9 +241,8 @@ export function storeSubscriber() {
 
     outputs.subscribe(async (data) => {
         // wait in case multiple slide layers get activated right after each other - to reduce the amount of updates
-        if (await hasNewerUpdate("LISTENER_OUTPUTS", 1)) return
-        // having more is probably better, but breaks some things including slide timeline updates
-        // if (await hasNewerUpdate("LISTENER_OUTPUTS", 15)) return
+        // Slightly higher debounce helps idle CPU without affecting capture framerate (capture is driven separately).
+        if (await hasNewerUpdate("LISTENER_OUTPUTS", 16)) return
 
         send(OUTPUT, ["OUTPUTS"], data)
         // used for stage mirror data
@@ -329,6 +330,36 @@ export function storeSubscriber() {
 
         send(OUTPUT, ["OUT_SLIDE_CACHE"], a)
         send(STAGE, ["OUT_SLIDE_CACHE"], a)
+    })
+
+    // Push preview buffers to STAGE web clients (current_output mirrors).
+    // This enables push-driven updates in PreviewCanvas instead of 500ms polling,
+    // greatly reducing idle CPU and request overhead while keeping capture rate.
+    previewBuffers.subscribe(async (buffers) => {
+        if (await hasNewerUpdate("LISTENER_PREVIEW_BUFFERS_STAGE", 33)) return
+
+        const stageConns = get(connections)?.STAGE || {}
+        if (Object.keys(stageConns).length === 0) return
+
+        // Push the latest captured frames for any outputs (clients filter / use what they need for current_output)
+        Object.entries(buffers || {}).forEach(([id, streamData]) => {
+            if (streamData) {
+                sendData(STAGE, { channel: "STREAM", data: { id, stream: streamData } })
+            }
+        })
+
+        // Occasional prune of stale preview buffers to reduce memory growth during long sessions with video
+        if (Math.random() < 0.1) {
+            previewBuffers.update((a) => {
+                const activeOutputs = get(outputs) || {}
+                Object.keys(a).forEach((k) => {
+                    if (!activeOutputs[k]?.enabled) {
+                        delete a[k]
+                    }
+                })
+                return a
+            })
+        }
     })
 
     customMetadata.subscribe((data) => {

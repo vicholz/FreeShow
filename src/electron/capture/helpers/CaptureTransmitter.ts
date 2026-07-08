@@ -314,14 +314,32 @@ export class CaptureTransmitter {
         BlackmagicSender.scheduleFrame(captureId, buffer, audioBuffer, framerate)
     }
 
-    // MAIN (STAGE OUTPUT)
+    // MAIN (STAGE OUTPUT) - used for stage web current_output mirrors and output windows
     static sendBufferToMain(captureId: string, image: NativeImage) {
         if (!image) return
-        // image = this.resizeImage(image, options.size, previewSize)
+
+        let size = image.getSize()
+
+        // For the "stage" (web mirror) channel, downscale the buffer before toBitmap.
+        // This keeps the capture framerate/FPS the same but significantly reduces
+        // bytes per frame, IPC cost, allocations, and canvas work on the client.
+        // Primary output quality and other channels (NDI etc.) are unaffected.
+        if (this.channels[`${captureId}-stage`]) {
+            const scale = 0.75
+            const newW = Math.max(1, Math.round(size.width * scale))
+            const newH = Math.max(1, Math.round(size.height * scale))
+            if (newW !== size.width || newH !== size.height) {
+                image = this.resizeImage(image, size, { width: newW, height: newH })
+                size = image.getSize()
+            }
+        }
 
         const buffer = image.toBitmap()
-        const size = image.getSize()
-        if (this.shouldSkipUnchangedNonBlackmagicFrame("stage", captureId, buffer, size)) return
+        if (this.shouldSkipUnchangedNonBlackmagicFrame("stage", captureId, buffer, size)) {
+            // still release
+            image = null as any
+            return
+        }
 
         /*  convert from ARGB/BGRA (Electron/Chromium capture output) to RGBA (Web canvas)  */
         this.convertToRGBA(buffer)
@@ -330,6 +348,9 @@ export class CaptureTransmitter {
         toApp(OUTPUT, msg)
         this.sendToStageOutputs(msg, captureId)
         this.sendToRequested(msg)
+
+        // Release reference ASAP for GC (mirrors blackmagic path)
+        image = null as any
     }
 
     // SERVER

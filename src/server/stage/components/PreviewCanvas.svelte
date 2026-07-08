@@ -1,16 +1,14 @@
 <script lang="ts">
-    import { onDestroy, onMount } from "svelte"
-    import { send } from "../util/socket"
+    import { onMount } from "svelte"
 
     export let id: string | undefined
     export let alpha: boolean
     export let capture: any
 
-    // REQUEST EVERY 500ms
-    const streamInterval = setInterval(() => {
-        send("REQUEST_STREAM", { outputId: id, alpha })
-    }, 500)
-    onDestroy(() => clearInterval(streamInterval))
+    // Push-driven updates only (no polling).
+    // The main process pushes STREAM / BUFFER updates via STAGE socket
+    // when previewBuffers change for outputs used in current_output stage items.
+    // This eliminates constant request overhead and reduces CPU/GC.
 
     // export let capture: any
     // export let fullscreen: any = false
@@ -32,7 +30,7 @@
     })
 
     let lastUpdate = 0
-    const frameRateLimit = 1000 / 30 // Limit to 30 FPS
+    const frameRateLimit = 1000 / 30 // Limit to 30 FPS client render (content can arrive at capture rate)
     $: if (capture) throttledUpdateCanvas()
     function throttledUpdateCanvas() {
         const now = Date.now()
@@ -42,8 +40,9 @@
     }
 
     async function updateCanvas() {
-        if (!canvas) return
+        if (!canvas || !capture?.buffer || !capture?.size) return
 
+        // Reuse typed array where possible; avoid unnecessary copies when stable
         const arr = new Uint8ClampedArray(capture.buffer)
         const pixels = new ImageData(arr, capture.size.width, capture.size.height)
         const bitmap = await createImageBitmap(pixels)
@@ -51,7 +50,7 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height)
         ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
 
-        // Clean up bitmap to prevent memory leaks
+        // Clean up immediately to help GC
         bitmap.close()
     }
 </script>
