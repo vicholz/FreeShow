@@ -118,14 +118,19 @@
 
     let listenerId = ""
     let receiving = false
+    let registered = false   // track actual registration for symmetric cleanup
 
     let mounted = false
     onMount(() => (mounted = true))
+
     $: if (id && !fadingOut && mounted) startReceiver()
     function startReceiver() {
-        const isStage = !!Object.values($outputs)[0]?.stageOutput
-        if ((mirror && !isStage) || receiving) return
+        const isStage = !!$outputs[outputId]?.stageOutput || !!Object.values($outputs)[0]?.stageOutput
+        const shouldRegister = !(mirror && !isStage)
+        if (!shouldRegister || receiving) return
+
         receiving = true
+        registered = true
 
         destroy(OUTPUT, listenerId)
 
@@ -136,8 +141,9 @@
     onDestroy(removeReceiver)
     $: if (fadingOut || id) removeReceiver()
     function removeReceiver() {
-        if (mirror || !receiving || !mounted) return
+        if (!registered || !receiving || !mounted) return
         receiving = false
+        registered = false
 
         destroy(OUTPUT, listenerId)
     }
@@ -214,7 +220,10 @@
     // AUDIO
 
     $: videoExists = !!video
-    $: if ($currentWindow === "output" && videoExists) analyseVideo()
+    $: if ($currentWindow === "output" && videoExists) {
+        const isStageMirror = mirror && ($outputs[outputId]?.stageOutput || Object.values($outputs)[0]?.stageOutput)
+        if (!isStageMirror) analyseVideo()
+    }
 
     onDestroy(() => {
         if ($currentWindow !== "output" || !previousPath) return

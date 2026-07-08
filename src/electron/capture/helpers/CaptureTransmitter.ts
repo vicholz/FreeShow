@@ -20,6 +20,9 @@ export class CaptureTransmitter {
     private static readonly AUDIO_PRESENT_MARKER = Buffer.from([1])
     private static readonly IS_BIG_ENDIAN = os.endianness() === "BE"
     private static readonly UNCHANGED_KEEPALIVE_MS = 250
+    // For stage mirrors (especially static slides), use a much longer keepalive so we don't
+    // re-send full frames of unchanged content every 250ms. Video will still force updates.
+    private static readonly STAGE_UNCHANGED_KEEPALIVE_MS = 2000
     private static readonly SERVER_RESIZE_THRESHOLDS = [
         { connections: 20, scale: 0.3 },
         { connections: 10, scale: 0.5 },
@@ -164,7 +167,9 @@ export class CaptureTransmitter {
         const now = performance.now()
         const previous = this.lastFrameState[channelId]
 
-        if (previous && previous.sizeKey === sizeKey && now - previous.lastSentAt < this.UNCHANGED_KEEPALIVE_MS) {
+        const keepalive = channelKey === "stage" ? this.STAGE_UNCHANGED_KEEPALIVE_MS : this.UNCHANGED_KEEPALIVE_MS
+
+        if (previous && previous.sizeKey === sizeKey && now - previous.lastSentAt < keepalive) {
             const signature = this.getQuickSignature(buffer, size)
             if (previous.signature === signature) {
                 return true
@@ -346,7 +351,10 @@ export class CaptureTransmitter {
 
         const msg = { channel: "BUFFER", data: { id: captureId, time: Date.now(), buffer, size } }
         toApp(OUTPUT, msg)
-        this.sendToStageOutputs(msg, captureId)
+        // Only send raw capture frames to windows that explicitly consume previewBuffers for canvas/preview.
+        // Content-based stage output windows (using <Output mirror> or StageLayout) render natively and
+        // do not need the heavy pixel flood. Web StageShow clients get data via the STREAM push path.
+        // this.sendToStageOutputs(msg, captureId)  -- disabled to stop flooding unused stage windows
         this.sendToRequested(msg)
 
         // Release reference ASAP for GC (mirrors blackmagic path)

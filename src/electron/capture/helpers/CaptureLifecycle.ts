@@ -117,6 +117,13 @@ export class CaptureLifecycle {
         if (this.captureLoopToken[id] !== token) return false
         if (!captureOpts.window || captureOpts.window.isDestroyed()) return false
         if (!captureOpts.window.webContents || captureOpts.window.webContents.isDestroyed?.()) return false
+
+        // Stop the loop entirely if no capture channels are enabled anymore.
+        // This prevents perpetual capturePage + GC at 1fps+ even when all NDI/stage/server/webrtc are off.
+        const opts = captureOpts.options || {}
+        const hasAny = opts.ndi || opts.blackmagic || opts.server || opts.stage || opts.webrtc
+        if (!hasAny) return false
+
         return true
     }
 
