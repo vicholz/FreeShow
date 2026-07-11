@@ -121,61 +121,42 @@ contextBridge.exposeInMainWorld("api", {
 Location: `src/frontend/IPC/main.ts`
 
 ```typescript
-import { uid } from "uid"
-import type { Main } from "../../types/IPC/Main"
-
-const MAIN = "MAIN"
+// (simplified — the real file adds full payload typing and cleanup)
 
 // Send one-way message (no response expected)
-export function sendMain(channel: Main, data: any) {
-  window.api.send(MAIN, { channel, data })
+export function sendMain<ID extends Main>(id: ID, value?: MainSendValue<ID>) {
+    window.api.send(MAIN, { channel: id, data: value })
 }
 
-// Send request and await response
-export async function requestMain(
-  channel: Main, 
-  data: any,
-  timeout: number = 15000
-): Promise<any> {
-  return new Promise((resolve, reject) => {
+// Send request and await the typed response
+export async function requestMain<ID extends Main>(
+    id: ID,
+    value?: MainSendValue<ID>,
+    callback?: (data) => void,
+    waitingTimeout = 15000
+) {
+    const listenerId = id + uid(5)
+    sendMain(id, value, listenerId) // listenerId travels as a third IPC argument
+
+    // resolves with the response whose listenerId matches;
+    // on timeout it logs (in dev) and resolves `undefined` — it does NOT throw
+    const returnData = await new Promise((resolve) => { /* listener + timeout */ })
+
+    if (callback) callback(returnData)
+    return returnData
+}
+
+// Listen for pushed messages from main (returns a listener id for destroyMain())
+export function receiveMain<ID extends Main>(id: ID, callback: (data) => void) {
     const listenerId = uid()
-    
-    // Set timeout
-    const timeoutId = setTimeout(() => {
-      window.api.removeListener(MAIN, listener)
-      reject(new Error(`IPC timeout: ${channel}`))
-    }, timeout)
-    
-    // Response listener
-    const listener = (response: any) => {
-      if (response.listenerId === listenerId) {
-        clearTimeout(timeoutId)
-        window.api.removeListener(MAIN, listener)
-        resolve(response.data)
-      }
-    }
-    
-    // Register listener
-    window.api.receive(MAIN, listener)
-    
-    // Send request
-    window.api.send(MAIN, { 
-      channel, 
-      data, 
-      listenerId 
-    })
-  })
-}
-
-// Listen for messages from main
-export function receiveMain(channel: Main, callback: Function) {
-  window.api.receive(MAIN, (msg: any) => {
-    if (msg.channel === channel) {
-      callback(msg.data)
-    }
-  })
+    window.api.receive(MAIN, (msg) => {
+        if (msg.channel === id) callback(msg.data)
+    }, listenerId)
+    return listenerId
 }
 ```
+
+⚠️ `requestMain` **resolves `undefined` on timeout instead of rejecting** — check the result before using it. Electron→frontend push channels use the separate `ToMain` enum (`receiveToMain`).
 
 ### Electron IPC Handler
 
@@ -393,44 +374,39 @@ export enum Main {
   TEMPLATES = "TEMPLATES",
   THEMES = "THEMES",
   SETTINGS = "SETTINGS",
-  
+  SYNCED_SETTINGS = "SYNCED_SETTINGS",
+
   // Files
   IMPORT = "IMPORT",
-  IMPORT_FILES = "IMPORT_FILES",
   SAVE = "SAVE",
   DELETE_SHOWS = "DELETE_SHOWS",
   BIBLE = "BIBLE",
-  
+
   // Window
   CLOSE = "CLOSE",
   MAXIMIZE = "MAXIMIZE",
   MINIMIZE = "MINIMIZE",
   FULLSCREEN = "FULLSCREEN",
-  
+
   // System
   VERSION = "VERSION",
-  OS = "OS",
+  GET_OS = "GET_OS",
   IP = "IP",
   DEVICE_ID = "DEVICE_ID",
-  RAM = "RAM",
-  
+  CHECK_RAM_USAGE = "CHECK_RAM_USAGE",
+
   // Media
   GET_THUMBNAIL = "GET_THUMBNAIL",
-  CHECK_RAM_USAGE = "CHECK_RAM_USAGE",
-  SUBTITLE = "SUBTITLE",
-  
-  // Audio
-  AUDIO_MAIN = "AUDIO_MAIN",
-  VISUALIZER_DATA = "VISUALIZER_DATA",
-  BUFFER = "BUFFER",
-  
+  ACCESS_CAMERA_PERMISSION = "ACCESS_CAMERA_PERMISSION",
+
   // Network
   SEND_SOCKET_MESSAGE = "SEND_SOCKET_MESSAGE",
-  LAG = "LAG",
-  
-  // ... 60+ total channels
+
+  // ... ~127 total channels
 }
 ```
+
+📝 Each channel has typed send/return payloads (`MainSendPayloads` / `MainReturnPayloads`) in the same file. High-frequency messages like `BUFFER`, `AUDIO_MAIN` and `VISUALIZER_DATA` are **not** `Main` channels — they travel on the separate `OUTPUT`/`AUDIO` Electron channels (see `src/types/Channels.ts`).
 
 ---
 
@@ -467,190 +443,111 @@ Socket.io enables real-time communication between the desktop app and web client
 
 ### Server Setup
 
-Location: `src/electron/servers.ts`
+Location: `src/electron/servers.ts` (simplified — the real file adds connection limits, Bonjour publishing and restart handling)
 
 ```typescript
 import express from "express"
-import { Server as SocketIOServer } from "socket.io"
 import http from "http"
+import { Server } from "socket.io"
+import { toApp } from "./index"
 
-// Server configurations
-const SERVERS = {
-  REMOTE: { port: 5510, path: "build/remote" },
-  STAGE: { port: 5511, path: "build/stage" },
-  CONTROLLER: { port: 5512, path: "build/controller" },
-  OUTPUT_STREAM: { port: 5513, path: "build/output_stream" }
+const serverPorts = { REMOTE: 5510, STAGE: 5511, CONTROLLER: 5512, OUTPUT_STREAM: 5513 }
+const ioServers: { [key: string]: Server } = {}
+
+function createServerInstance(id: "REMOTE" | "STAGE" | "CONTROLLER" | "OUTPUT_STREAM") {
+    const app = express()
+    const server = http.createServer(app)
+
+    // serve the built web app (build/electron/<id>/)
+    app.use(express.static(join(__dirname, id.toLowerCase())))
+
+    const io = new Server(server)
+    ioServers[id] = io
+
+    io.on("connection", (socket) => {
+        // enforce max connection limit, then:
+        toApp(id, { channel: "CONNECTION", id: socket.id, data: { name } })
+
+        // CLIENT → APP: forward every message to the renderer on the server's own channel
+        socket.on(id, (msg) => toApp(id, msg))
+
+        socket.on("disconnect", () => toApp(id, { channel: "DISCONNECT", id: socket.id }))
+    })
+
+    server.listen(serverPorts[id])
 }
 
-// Storage for server instances
-const ioServers: { [key: string]: SocketIOServer } = {}
-const connections: { [key: string]: any } = {}
-
-// Create server
-export function createServer(
-  serverName: string, 
-  port: number, 
-  staticPath: string
-) {
-  // Express app
-  const app = express()
-  
-  // Serve static files
-  app.use(express.static(staticPath))
-  
-  // HTTP server
-  const httpServer = http.createServer(app)
-  
-  // Socket.io server
-  const io = new SocketIOServer(httpServer, {
-    cors: {
-      origin: "*",
-      methods: ["GET", "POST"]
-    },
-    maxHttpBufferSize: 1e8 // 100 MB
-  })
-  
-  // Store instance
-  ioServers[serverName] = io
-  
-  // Connection handling
-  io.on("connection", (socket) => {
-    console.log(`${serverName} client connected: ${socket.id}`)
-    
-    // Track connection
-    connections[socket.id] = {
-      server: serverName,
-      connected: Date.now()
-    }
-    
-    // Handle messages from client
-    socket.on(serverName, (msg) => {
-      console.log(`${serverName} received:`, msg)
-      
-      // Forward to desktop app via IPC
-      toApp(serverName, msg, socket.id)
+// APP → CLIENT: the renderer sends on the server-name IPC channel,
+// and this bridge emits it to the connected sockets
+function registerIpcBridge(id: string) {
+    ipcMain.on(id, (_e, msg) => {
+        const io = ioServers[id]
+        if (msg?.id) io?.to(msg.id).emit(id, msg)  // targeted to one socket
+        else io?.emit(id, msg)                     // broadcast
     })
-    
-    // Handle disconnection
-    socket.on("disconnect", () => {
-      console.log(`${serverName} client disconnected: ${socket.id}`)
-      delete connections[socket.id]
-    })
-  })
-  
-  // Start server
-  httpServer.listen(port, () => {
-    console.log(`${serverName} server listening on port ${port}`)
-  })
-}
-
-// Forward message to desktop app
-function toApp(serverName: string, msg: any, socketId: string) {
-  // Get main window
-  const mainWindow = getMainWindow()
-  
-  if (mainWindow) {
-    // Send via IPC
-    mainWindow.webContents.send("FROM_SERVER", {
-      server: serverName,
-      message: msg,
-      socketId
-    })
-  }
-}
-
-// Send message to all clients
-export function sendToClients(serverName: string, channel: string, data: any) {
-  const io = ioServers[serverName]
-  
-  if (io) {
-    io.emit(channel, data)
-  }
 }
 ```
+
+📝 There is no separate "FROM_SERVER" channel — messages from web clients arrive in the renderer **on the server's own channel name** (`REMOTE`, `STAGE`, ...), and the renderer sends replies back on that same channel. See `src/frontend/utils/receivers.ts` (`window.api.receive(STAGE, ...)`) and `src/frontend/utils/sendData.ts`.
 
 ### Client Connection (Browser)
 
 Location: `src/server/stage/util/socket.ts`
 
 ```typescript
-import io from "socket.io-client"
+import { io } from "socket.io-client"
+import { receiver, type ReceiverKey } from "./receiver"
 
-export let socket = io({
-  reconnection: true,
-  reconnectionDelay: 1000,
-  reconnectionAttempts: 5
-})
+const socket = io()
 
-// Listen for stage updates
-socket.on("STAGE", (msg) => {
-  console.log("Stage message received:", msg)
-  
-  const { channel, data } = msg
-  
-  switch (channel) {
-    case "BACKGROUND":
-      updateBackground(data)
-      break
-    case "SLIDE":
-      updateSlide(data)
-      break
-    case "OVERLAY":
-      updateOverlay(data)
-      break
-  }
-})
+export function initSocket() {
+    socket.on("connect", () => {
+        send("LAYOUTS") // ask the app which stage layouts exist
+    })
 
-// Send message to desktop app
-export function send(channel: string, data: any) {
-  socket.emit("STAGE", { channel, data })
+    // every message from the app arrives on the "STAGE" event,
+    // and is dispatched to a handler map in util/receiver.ts
+    socket.on("STAGE", (msg) => {
+        const key = msg.channel as ReceiverKey
+        if (receiver[key]) receiver[key](msg.data)
+    })
 }
+
+// Send message to the desktop app
+export const send = (channel: string, data: any = null) =>
+    socket.emit("STAGE", { id, channel, data })
 ```
+
+The handlers live in `src/server/stage/util/receiver.ts` — one entry per channel (`LAYOUTS`, `OUT`, `BACKGROUND`, `TIMERS`, ...), each updating the client's Svelte stores.
 
 ### Frontend Socket Helper
 
-Location: `src/frontend/utils/stageTalk.ts`
+Sending to web clients does **not** go through a `Main` channel — the renderer sends directly on the server-name IPC channel and the bridge in `servers.ts` emits it to the sockets:
+
+Location: `src/frontend/utils/request.ts`
 
 ```typescript
-import { sendMain } from "../IPC/main"
-import { Main } from "../../types/IPC/Main"
-
-// Send message to STAGE clients
-export function send(channel: string, data: any) {
-  sendMain(Main.SEND_SOCKET_MESSAGE, {
-    server: "STAGE",
-    channel,
-    data
-  })
-}
-
-// Send background to stage
-export function sendBackgroundToStage(output: Output) {
-  const { background, mediaStyle } = output
-  
-  send("BACKGROUND", {
-    path: background,
-    mediaStyle,
-    timestamp: Date.now()
-  })
-}
-
-// Send slide to stage
-export function sendSlideToStage(slide: Slide) {
-  const { id, items, color, settings } = slide
-  
-  send("SLIDE", {
-    id,
-    items: items.map(item => ({
-      type: item.type,
-      text: item.text,
-      style: item.style
-    })),
-    color,
-    settings
-  })
+// send a message to all connected clients of a server
+export function send(ID: ValidChannels, channels: string[], data: any = null) {
+    channels.forEach((channel) => window.api.send(ID, { channel, data }))
 }
 ```
+
+Used like this in `src/frontend/utils/stageTalk.ts`:
+
+```typescript
+import { STAGE } from "../../types/Channels"
+import { send } from "./request"
+
+// push the current/next background to StageShow clients
+export async function sendBackgroundToStage(outputId, updater = get(outputs)) {
+    const path = updater[outputId]?.out?.background?.path || ""
+    const bg = { path: await getBase64Path(path), mediaStyle: get(media)[path] || {}, ... }
+    send(STAGE, ["BACKGROUND"], bg)
+}
+```
+
+Incoming client requests are answered by handler maps: `receiveSTAGE` in `stageTalk.ts`, `receiveREMOTE` in `remoteTalk.ts`, `receiveCONTROLLER` in `controllerTalk.ts` — dispatched by `sendData()` in `src/frontend/utils/sendData.ts`. Store changes are broadcast automatically by subscriptions in `src/frontend/utils/listeners.ts`.
 
 ### Socket Message Flow
 
@@ -731,15 +628,12 @@ export function sendSlideToStage(slide: Slide) {
 
 **Remote Control (Browser):**
 ```svelte
-<!-- src/server/remote/components/Controls.svelte -->
 <script lang="ts">
-  import { socket } from "../util/socket"
-  
+  import { send } from "../util/socket"
+
   function next() {
-    socket.emit("REMOTE", {
-      channel: "NEXT_SLIDE",
-      data: {}
-    })
+    // "API:" channels invoke actions from src/frontend/components/actions/api.ts
+    send("API:next_slide")
   }
 </script>
 
@@ -747,22 +641,17 @@ export function sendSlideToStage(slide: Slide) {
 ```
 
 **Desktop App:**
-```svelte
-<!-- src/frontend/App.svelte -->
-<script lang="ts">
-  import { receiveMain } from "./IPC/main"
-  
-  receiveMain("FROM_SERVER", (msg) => {
-    if (msg.server === "REMOTE" && msg.message.channel === "NEXT_SLIDE") {
-      goToNextSlide()
-    }
-  })
-  
-  function goToNextSlide() {
-    // Update activeShow store
-    // Send update to STAGE
-  }
-</script>
+
+No component code is needed — the message flows through existing plumbing:
+
+```typescript
+// src/frontend/utils/receivers.ts registers, for each server:
+window.api.receive(REMOTE, (msg) => client(REMOTE, msg))
+
+// src/frontend/utils/sendData.ts routes it:
+// - "API:<id>" channels call API_ACTIONS[id]  (api.ts → next_slide → nextSlideIndividual())
+// - other channels call the receiveREMOTE[channel] handler in remoteTalk.ts
+// The handler's return value (if any) is sent back to the requesting socket.
 ```
 
 ---
@@ -776,34 +665,26 @@ Svelte stores provide reactive state management within the frontend application.
 Location: `src/frontend/stores.ts`
 
 ```typescript
-import { writable } from "svelte/store"
+import { writable, type Writable } from "svelte/store"
 
 // UI State
-export const activePage = writable<string>("show")
-export const activePopup = writable<string | null>(null)
-export const focusMode = writable<boolean>(false)
+export const activePage: Writable<TopViews> = writable("show")
+export const activePopup: Writable<null | Popups> = writable(null)
+export const focusMode: Writable<boolean> = writable(false)
 
-// Show Data
-export const activeShow = writable<ActiveShow | null>(null)
-export const showsCache = writable<{ [key: string]: Show }>({})
-export const projects = writable<Project[]>([])
+// Show Data (maps keyed by id, not arrays)
+export const activeShow: Writable<null | ShowRef> = writable(null)
+export const showsCache: Writable<Shows> = writable({})       // { [showId]: Show }
+export const projects: Writable<Projects> = writable({})      // { [projectId]: Project }
 
 // Display State
-export const outputs = writable<{ [key: string]: Output }>({})
-export const themes = writable<Theme[]>([])
+export const outputs: Writable<Outputs> = writable({})        // { [outputId]: Output }
+export const themes: Writable<{ [key: string]: Themes }> = writable({})
 
-// Network
-export const connections = writable<{
-  REMOTE: Connection[]
-  STAGE: Connection[]
-  CONTROLLER: Connection[]
-  OUTPUT_STREAM: Connection[]
-}>({
-  REMOTE: [],
-  STAGE: [],
-  CONTROLLER: [],
-  OUTPUT_STREAM: []
-})
+// Network — connected clients per server, keyed by socket id
+export const connections: Writable<{
+    [server: string]: { [socketId: string]: { entered?: boolean; active?: string } }
+}> = writable({})
 ```
 
 ### Using Stores in Components
@@ -909,9 +790,9 @@ export const connections = writable<{
 
 ### Custom Stores
 
-```typescript
-// src/frontend/stores.ts
+📝 FreeShow's `stores.ts` uses plain `writable()` stores throughout — the pattern below is standard Svelte, useful if you need a store with attached behavior:
 
+```typescript
 import { writable } from "svelte/store"
 
 // Create custom store with methods
@@ -960,39 +841,38 @@ export const currentShow = createShowStore()
 │    User clicks "Next" button            │
 │    ↓                                    │
 │    socket.emit("REMOTE", {              │
-│      channel: "NEXT_SLIDE"              │
+│      channel: "API:next_slide"          │
 │    })                                   │
 └────────────────┬────────────────────────┘
                  │ WebSocket
 ┌────────────────▼────────────────────────┐
 │ 2. Electron Main Process                │
-│    servers.ts receives message          │
+│    servers.ts: socket.on("REMOTE")      │
 │    ↓                                    │
 │    toApp("REMOTE", msg)                 │
-│    ↓                                    │
-│    IPC → Renderer                       │
+│    (IPC channel = "REMOTE")             │
 └────────────────┬────────────────────────┘
                  │ IPC
 ┌────────────────▼────────────────────────┐
 │ 3. Frontend (Renderer)                  │
-│    receiveMain("FROM_SERVER", msg)      │
+│    receivers.ts: client("REMOTE", msg)  │
+│    ↓ sendData()                         │
+│    API_ACTIONS.next_slide()             │
 │    ↓                                    │
-│    handleNextSlide()                    │
-│    ↓                                    │
-│    activeShow.update(incrementIndex)    │
+│    outputs store updated (new slide)    │
 └────────────────┬────────────────────────┘
                  │ Reactive
 ┌────────────────▼────────────────────────┐
-│ 4. Reactive Statement                   │
-│    $: if ($activeShow changed)          │
-│       sendSlideToStage()                │
+│ 4. Store subscriptions (listeners.ts)   │
+│    outputs.subscribe(...)               │
 │    ↓                                    │
-│    stageTalk.send("SLIDE", ...)         │
+│    send(OUTPUT, ["OUTPUTS"], data)      │  → output windows
+│    sendData(STAGE, { channel: "OUT" })  │  → stage clients
 └────────────────┬────────────────────────┘
                  │ IPC + Socket.io
 ┌────────────────▼────────────────────────┐
 │ 5. Stage Display (Browser)              │
-│    socket.on("STAGE", ...)              │
+│    socket.on("STAGE", ...) → receiver   │
 │    ↓                                    │
 │    Update displayed slide               │
 └─────────────────────────────────────────┘

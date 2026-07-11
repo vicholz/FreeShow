@@ -38,7 +38,8 @@ src/
 ├── server/            # Web server apps
 │   ├── remote/        # Remote control (5510)
 │   ├── stage/         # Stage display (5511)
-│   └── controller/    # Controller (5512)
+│   ├── controller/    # Controller (5512)
+│   └── output_stream/ # Output stream (5513)
 │
 └── types/             # TypeScript types
     ├── Show.ts        # Show/Slide types
@@ -52,29 +53,28 @@ src/
 ### IPC (Electron Main ↔ Renderer)
 
 ```typescript
-// Send request and await response
-const result = await requestMain(Main.SHOWS, { id: '123' })
+// Send request and await response (resolves undefined on timeout — no throw)
+const result = await requestMain(Main.SHOWS)
 
 // Send one-way message
-sendMain(Main.SETTINGS, { key: 'theme', value: 'dark' })
+sendMain(Main.AUTO_UPDATE)
 
-// Listen for messages
-receiveMain(Main.UPDATE, (data) => {
-  console.log('Update received:', data)
+// Listen for pushed messages (electron → frontend uses the ToMain enum)
+const listenerId = receiveToMain(ToMain.TOAST, (data) => {
+  console.log('Toast received:', data)
 })
+// later: destroyMain(listenerId)
 ```
 
 ### Socket.io (Desktop ↔ Web Clients)
 
 ```typescript
-// Send to stage display
-send('STAGE', 'SLIDE', { text: 'Hello' })
+// Send to StageShow clients (frontend → sockets, via utils/request.ts)
+send(STAGE, ["BACKGROUND"], { path })
 
-// Listen for messages
-socket.on('REMOTE', (msg) => {
-  if (msg.channel === 'NEXT_SLIDE') {
-    goToNextSlide()
-  }
+// Client-side (web app): every message arrives on the server-name event
+socket.on('STAGE', (msg) => {
+  receiver[msg.channel]?.(msg.data)   // handler map in util/receiver.ts
 })
 ```
 
@@ -179,25 +179,20 @@ socket.on('REMOTE', (msg) => {
   import { requestMain } from '../IPC/main'
   import { Main } from '../../types/IPC/Main'
   
-  let data = []
+  let data = null
   let loading = true
-  let error = null
   
   onMount(async () => {
-    try {
-      data = await requestMain(Main.SHOWS, {})
-    } catch (err) {
-      error = err.message
-    } finally {
-      loading = false
-    }
+    // resolves undefined on timeout — it does not throw
+    data = await requestMain(Main.SHOWS)
+    loading = false
   })
 </script>
 
 {#if loading}
   <p>Loading...</p>
-{:else if error}
-  <p>Error: {error}</p>
+{:else if !data}
+  <p>Could not load data</p>
 {:else}
   <!-- Content -->
 {/if}
@@ -242,23 +237,17 @@ socket.on('REMOTE', (msg) => {
 
 ```svelte
 <script lang="ts">
-  import { activeShow, outputs } from '../stores'
-  import { send } from '../utils/stageTalk'
+  import { activeShow } from '../stores'
   
   // Run when store changes
   $: if ($activeShow) {
     console.log('Show changed:', $activeShow)
     loadSlideData($activeShow.id)
   }
-  
-  // Send to stage when outputs change
-  $: if ($outputs) {
-    Object.entries($outputs).forEach(([id, output]) => {
-      send('OUTPUT', { id, ...output })
-    })
-  }
 </script>
 ```
+
+📝 Broadcasting store changes to outputs/web clients is centralized in `src/frontend/utils/listeners.ts` — components rarely need to do it themselves.
 
 ### List with Selection
 
@@ -373,13 +362,13 @@ Main.MAXIMIZE       // Maximize window
 Main.MINIMIZE       // Minimize window
 
 // System
-Main.VERSION        // Get app version
-Main.OS             // Get OS info
-Main.IP             // Get IP address
+Main.VERSION          // Get app version
+Main.GET_OS           // Get OS info
+Main.IP               // Get IP address
 
 // Media
-Main.GET_THUMBNAIL  // Get thumbnail
-Main.CHECK_RAM      // Check RAM usage
+Main.GET_THUMBNAIL    // Get thumbnail
+Main.CHECK_RAM_USAGE  // Check RAM usage
 
 // Network
 Main.SEND_SOCKET_MESSAGE  // Send to Socket.io clients

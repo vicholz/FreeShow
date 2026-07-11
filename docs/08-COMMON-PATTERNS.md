@@ -32,7 +32,9 @@ Display a list of items with selection state.
     activeShow.set({ id, type: 'show' })
     
     // Update selected items
-    selected.set({ id: [id] })
+    // (the real store shape is { id: SelectIds | null, data: any[] } —
+    //  "id" is the selection TYPE, "data" holds the selected entries)
+    selected.set({ id: 'show', data: [{ id }] })
   }
   
   function handleMultiSelect(event: CustomEvent) {
@@ -42,11 +44,11 @@ Display a list of items with selection state.
       // Add to selection
       selected.update(s => ({
         ...s,
-        id: [...(s.id || []), id]
+        data: [...s.data, { id }]
       }))
     } else {
       // Replace selection
-      selected.set({ id: [id] })
+      selected.set({ id: 'show', data: [{ id }] })
     }
   }
 </script>
@@ -617,20 +619,17 @@ export const userPreferences = createPersistentStore('preferences', {
   import { Main } from '../../types/IPC/Main'
   
   let loading = false
-  let error = null
+  let error = false
   let result = null
   
   async function loadData() {
     loading = true
-    error = null
+    error = false
     
-    try {
-      result = await requestMain(Main.SHOWS, {})
-    } catch (err) {
-      error = err.message
-    } finally {
-      loading = false
-    }
+    // ⚠️ requestMain resolves `undefined` on timeout — it does not reject
+    result = await requestMain(Main.SHOWS)
+    if (result === undefined) error = true
+    loading = false
   }
 </script>
 
@@ -658,20 +657,8 @@ export const userPreferences = createPersistentStore('preferences', {
     const results = []
     
     for (const file of files) {
-      try {
-        const result = await requestMain(
-          Main.IMPORT_FILES,
-          { files: [file.path] },
-          30000  // 30 second timeout
-        )
-        results.push({ file: file.name, success: true })
-      } catch (error) {
-        results.push({ 
-          file: file.name, 
-          success: false, 
-          error: error.message 
-        })
-      }
+      const result = await requestMain(Main.IMPORT_FILES, { files: [file.path] })
+      results.push({ file: file.name, success: result !== undefined })
     }
     
     return results
@@ -684,21 +671,26 @@ export const userPreferences = createPersistentStore('preferences', {
 ```svelte
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import { receiveMain } from '../IPC/main'
-  import { Main } from '../../types/IPC/Main'
-  
+  import { receiveToMain, destroyMain } from '../IPC/main'
+  import { ToMain } from '../../types/IPC/ToMain'
+
   let updates = []
+  let listenerId = ''
   
   function handleUpdate(data: any) {
     updates = [...updates, data]
   }
   
   onMount(() => {
-    receiveMain(Main.UPDATE_PROGRESS, handleUpdate)
+    // electron→frontend pushes use the ToMain enum;
+    // the receive helpers return a listener id — keep it for cleanup
+    listenerId = receiveToMain(ToMain.TOAST, handleUpdate)
   })
   
-  // Note: receiveMain doesn't return cleanup function
-  // Cleanup happens automatically on component destroy
+  onDestroy(() => {
+    // remove the ipcRenderer listener, or it leaks across remounts
+    destroyMain(listenerId)
+  })
 </script>
 
 <div>
@@ -840,48 +832,35 @@ export const userPreferences = createPersistentStore('preferences', {
 
 ### Pattern 1: CRUD Operations
 
+📝 In FreeShow, show edits go through the **history system** (`components/helpers/history.ts`) so they are undoable, and saving is batched via `Main.SAVE`. The sketch below shows the general CRUD shape; real code should use `history()` for edits:
+
 ```typescript
-// showManager.ts
+// illustrative CRUD sketch
 import { requestMain, sendMain } from './IPC/main'
 import { Main } from '../types/IPC/Main'
 import { showsCache } from './stores'
-import type { Show } from '../types/Show'
 
 export async function loadShows() {
-  const shows = await requestMain(Main.SHOWS, {})
-  showsCache.set(shows)
+  const shows = await requestMain(Main.SHOWS)   // resolves undefined on timeout
+  if (shows) showsCache.set(shows)
   return shows
 }
 
-export async function createShow(show: Partial<Show>) {
-  const newShow = await requestMain(Main.CREATE_SHOW, show)
-  
-  showsCache.update(cache => ({
-    ...cache,
-    [newShow.id]: newShow
-  }))
-  
-  return newShow
+export function updateShowName(id: string, name: string) {
+  // real pattern: an undoable history action
+  history({
+    id: "UPDATE",
+    newData: { key: "name", data: name },
+    oldData: { id },
+    location: { page: "show", id: "show_key" }
+  })
 }
 
-export async function updateShow(id: string, changes: Partial<Show>) {
-  await sendMain(Main.UPDATE_SHOW, { id, changes })
-  
-  showsCache.update(cache => ({
-    ...cache,
-    [id]: {
-      ...cache[id],
-      ...changes
-    }
-  }))
-}
-
-export async function deleteShow(id: string) {
-  await sendMain(Main.DELETE_SHOWS, { ids: [id] })
-  
+export function deleteShows(ids: { id: string; name: string }[]) {
+  sendMain(Main.DELETE_SHOWS, { shows: ids })   // one-way, no response
   showsCache.update(cache => {
-    const { [id]: removed, ...rest } = cache
-    return rest
+    ids.forEach(({ id }) => delete cache[id])
+    return cache
   })
 }
 ```
@@ -894,8 +873,9 @@ export async function deleteShow(id: string) {
   import { Main } from '../../types/IPC/Main'
   import { showsCache } from '../stores'
   
-  async function updateShowName(id: string, name: string) {
-    // Update UI immediately (optimistic)
+  function updateShowName(id: string, name: string) {
+    // Update UI immediately (optimistic) — stores are the source of truth,
+    // and the SAVE flow persists them to disk later (autosave / Ctrl+S)
     showsCache.update(cache => ({
       ...cache,
       [id]: {
@@ -903,15 +883,9 @@ export async function deleteShow(id: string) {
         name
       }
     }))
-    
-    try {
-      // Send to backend
-      await sendMain(Main.UPDATE_SHOW, { id, name })
-    } catch (error) {
-      // Revert on error
-      console.error('Failed to update:', error)
-      // Could reload or show error
-    }
+
+    // mark unsaved changes
+    saved.set(false)
   }
 </script>
 ```

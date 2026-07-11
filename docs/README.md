@@ -4,7 +4,7 @@ Welcome to the comprehensive developer documentation for FreeShow! This document
 
 ## 📚 Documentation Overview
 
-This documentation consists of **8 comprehensive guides** with detailed examples, patterns, and best practices:
+This documentation consists of **15 comprehensive guides** with detailed examples, patterns, and best practices:
 
 ### 1. [Index](00-INDEX.md) - Start Here!
 Quick navigation to all documentation with recommended reading paths for different experience levels.
@@ -61,7 +61,13 @@ Comprehensive Svelte tutorial with FreeShow-specific patterns.
 - Props, events, and lifecycle
 - Common gotchas and solutions
 
-### 7. [Common Patterns](08-COMMON-PATTERNS.md)
+### 7. [Electron Guide](06-ELECTRON-GUIDE.md)
+Main process deep-dive: startup, windows, IPC handlers, storage, and system integration.
+
+### 8. [Vite & Build System](07-VITE-BUILD.md)
+The development workflow, the three build pipelines, and packaging with electron-builder.
+
+### 9. [Common Patterns](08-COMMON-PATTERNS.md)
 Real-world code patterns and examples from the FreeShow codebase.
 
 **Topics:**
@@ -72,6 +78,26 @@ Real-world code patterns and examples from the FreeShow codebase.
 - Data management (CRUD, optimistic updates, caching)
 - UI patterns (keyboard shortcuts, drag & drop, infinite scroll)
 - Performance patterns (virtual lists, debouncing, lazy loading)
+
+### 10. [Adding Features](09-ADDING-FEATURES.md)
+Step-by-step recipes: UI components, stores, IPC channels, server messages, context menus, translations.
+
+### 11. [Debugging Guide](10-DEBUGGING.md)
+Troubleshooting each layer: DevTools, IPC logging, output windows, servers, common problems.
+
+### 12. [Testing Guide](11-TESTING.md)
+The test suite (Playwright E2E + static checks), manual testing passes, and writing new tests.
+
+### 13. [Technology Stack](12-TECHNOLOGIES.md)
+Every major library and what it's used for — including the native modules.
+
+### 14. [API Reference](13-API-REFERENCE.md)
+Typed IPC, socket messages, the action API, and the external WebSocket/REST/OSC control API.
+
+### 15. [Contributing](14-CONTRIBUTING.md)
+Branches, PRs, code style, project conventions, and community.
+
+*Plus a one-page [Quick Reference Card](QUICK-REFERENCE.md).*
 
 ---
 
@@ -114,7 +140,7 @@ Each guide includes:
 - ✅ Links to related documentation
 
 ### Total Content
-- **~5,000+ lines** of documentation
+- **15 guides, ~8,000+ lines** of documentation
 - **100+ code examples**
 - **20+ diagrams**
 - **50+ patterns and techniques**
@@ -158,7 +184,16 @@ docs/
 ├── 03-QUICK-START.md           # Setup and installation
 ├── 04-COMMUNICATION.md         # IPC, Socket.io, Stores
 ├── 05-SVELTE-GUIDE.md          # Svelte deep-dive
+├── 06-ELECTRON-GUIDE.md        # Main process deep-dive
+├── 07-VITE-BUILD.md            # Build system and dev workflow
 ├── 08-COMMON-PATTERNS.md       # Real code patterns
+├── 09-ADDING-FEATURES.md       # Feature recipes
+├── 10-DEBUGGING.md             # Troubleshooting techniques
+├── 11-TESTING.md               # Test suite and manual testing
+├── 12-TECHNOLOGIES.md          # Library reference
+├── 13-API-REFERENCE.md         # IPC/socket/external APIs
+├── 14-CONTRIBUTING.md          # Contribution guidelines
+├── QUICK-REFERENCE.md          # One-page cheatsheet
 └── README.md                   # This file
 ```
 
@@ -266,8 +301,8 @@ Found something unclear? Have a suggestion?
 
 ## 📊 Documentation Statistics
 
-- **Total Pages:** 8 guides
-- **Total Lines:** ~5,000+
+- **Total Pages:** 15 guides
+- **Total Lines:** ~8,000+
 - **Code Examples:** 100+
 - **Patterns:** 50+
 - **Diagrams:** 20+

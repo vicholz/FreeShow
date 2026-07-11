@@ -344,15 +344,15 @@ Core functionality works without internet connection.
 
 ### Servers (Web Apps)
 - **Framework:** Svelte 3
-- **Build Tool:** Rollup
+- **Build Tool:** Vite (one build per server via `scripts/vite/createServerFiles.js` + `config/building/vite.config.servers.mjs`)
 - **Language:** TypeScript
 - **Communication:** Socket.io-client
 - **Served By:** Express static middleware
 
 ### Build System
-- **Frontend:** Vite (dev), Vite + Rollup (prod)
-- **Servers:** Rollup with Svelte plugin
-- **Electron:** TypeScript compiler
+- **Frontend:** Vite (dev server + production build)
+- **Servers:** Vite with the Svelte plugin (`VITE_SERVER_ID` selects remote/stage/controller/output_stream)
+- **Electron:** TypeScript compiler (`tsc`)
 - **Packaging:** electron-builder
 
 ---
@@ -397,8 +397,9 @@ Core functionality works without internet connection.
 │  • 0.0.0.0:5513 (OUTPUT_STREAM)    │
 │                                     │
 │  Advertises via Bonjour/mDNS:      │
-│  • _freeshow-remote._tcp           │
-│  • _freeshow-stage._tcp            │
+│  (service type "freeshow")         │
+│  • freeshow-REMOTE-<id>            │
+│  • freeshow-STAGE-<id>             │
 └─────────────────┬───────────────────┘
                   │
                   │ Local Network

@@ -25,6 +25,7 @@ Welcome to the FreeShow developer documentation! This guide will help you unders
 12. **[Technology Stack](12-TECHNOLOGIES.md)** - Deep dive into libraries and tools
 13. **[API Reference](13-API-REFERENCE.md)** - Key APIs and interfaces
 14. **[Contributing](14-CONTRIBUTING.md)** - Code style, PR guidelines, best practices
+15. **[Quick Reference Card](QUICK-REFERENCE.md)** - One-page cheatsheet for common tasks
 
 ## 🎯 Quick Navigation
 
@@ -47,7 +48,7 @@ Welcome to the FreeShow developer documentation! This guide will help you unders
 - [Debug server issues](10-DEBUGGING.md#server-debugging) → Server Debugging
 
 **Learn specific tech:**
-- [How Svelte works](05-SVELTE-GUIDE.md#how-svelte-works) → Svelte Deep Dive
+- [How Svelte works](05-SVELTE-GUIDE.md#what-is-svelte) → Svelte Deep Dive
 - [How Electron works](06-ELECTRON-GUIDE.md#electron-fundamentals) → Electron Deep Dive
 - [How Vite works](07-VITE-BUILD.md#how-vite-works) → Vite Deep Dive
 
@@ -62,7 +63,7 @@ Welcome to the FreeShow developer documentation! This guide will help you unders
 
 ### For Svelte Beginners
 1. [Svelte Guide](05-SVELTE-GUIDE.md) - Comprehensive Svelte tutorial
-2. [Common Patterns](08-COMMON-PATTERNS.md#svelte-patterns) - Svelte patterns used here
+2. [Common Patterns](08-COMMON-PATTERNS.md#component-patterns) - Svelte patterns used here
 3. [Adding Features](09-ADDING-FEATURES.md#adding-a-ui-component) - Practice with examples
 
 ### For Electron Beginners

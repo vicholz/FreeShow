@@ -29,10 +29,11 @@ FreeShow/
 │   └── build/              # Built frontend assets (generated)
 │
 ├── build/                  # Compiled code (generated)
-│   ├── electron/           # Compiled Electron code
-│   ├── remote/             # Compiled Remote server
-│   ├── stage/              # Compiled Stage server
-│   └── controller/         # Compiled Controller server
+│   └── electron/           # Compiled Electron code
+│       ├── remote/         # Compiled Remote server
+│       ├── stage/          # Compiled Stage server
+│       ├── controller/     # Compiled Controller server
+│       └── output_stream/  # Compiled Output Stream server
 │
 ├── dist/                   # Packaged applications (generated)
 │   ├── win-unpacked/       # Windows build
@@ -53,12 +54,13 @@ FreeShow/
 │   └── vite/               # Vite-related scripts
 │
 ├── docs/                   # Documentation (this folder!)
-├── tests/                  # Automated tests
 ├── node_modules/           # Dependencies (generated)
 ├── package.json            # Project metadata and scripts
-├── vite.config.mjs         # Vite configuration
+├── vite.config.mjs         # Vite configuration (frontend)
 └── svelte.config.mjs       # Svelte configuration
 ```
+
+📝 Automated tests live in `config/testing/` (Playwright config + `start.test.ts`), not a top-level `tests/` folder.
 
 ---
 
@@ -76,12 +78,12 @@ src/
 
 ### File Count Reference
 
-| Directory | Files | Lines of Code | Purpose |
-|-----------|-------|---------------|---------|
-| `src/frontend/` | ~500 | ~60,000 | UI components and logic |
-| `src/electron/` | ~100 | ~20,000 | Backend and system integration |
-| `src/server/` | ~80 | ~8,000 | Web server applications |
-| `src/types/` | ~30 | ~25,000 | Type definitions |
+| Directory | Files | Purpose |
+|-----------|-------|---------|
+| `src/frontend/` | ~590 | UI components and logic |
+| `src/electron/` | ~95 | Backend and system integration |
+| `src/server/` | ~140 | Web server applications |
+| `src/types/` | ~21 | Type definitions |
 
 ---
 
@@ -100,33 +102,37 @@ frontend/
 ├── stores.ts               # 🗄️  Global state (100+ stores)
 │
 ├── components/             # 🧩 UI Components
-│   ├── main/               # Core UI elements
-│   ├── show/               # Show management
+│   ├── main/               # Core UI elements (MenuBar, Popup, Tabs, ...)
+│   ├── show/               # Show & project management
 │   ├── edit/               # Slide editing
 │   ├── slide/              # Slide rendering
-│   ├── drawer/             # Side panels
-│   ├── output/             # Output controls
+│   ├── drawer/             # Bottom drawer (bible/, audio/, media/, calendar/, live/, ... subfolders)
+│   ├── output/             # Output rendering & controls
 │   ├── stage/              # Stage layouts
 │   ├── timeline/           # Animation timeline
 │   ├── settings/           # Settings interface
-│   ├── helpers/            # Utility components
+│   ├── actions/            # Actions & API triggers
+│   ├── helpers/            # Utility modules (output.ts, media.ts, history, ...)
 │   ├── context/            # Context menus
-│   ├── input/              # Form inputs
-│   └── system/             # Layout components
+│   ├── input/ + inputs/    # Form inputs
+│   ├── quicksearch/        # Quick search
+│   ├── export/, guide/, draw/, media/, system/  # More feature areas
 │
 ├── audio/                  # 🎵 Audio system
 │   ├── audioPlayer.ts
 │   ├── audioAnalyser.ts
+│   ├── audioAnalyserMerger.ts
 │   ├── audioEqualizer.ts
 │   ├── audioPlaylist.ts
+│   ├── audioFading.ts
 │   └── ...
 │
 ├── converters/             # 🔄 Import converters
-│   ├── powerpoint.ts
-│   ├── pdf.ts
+│   ├── powerpoint/         # (folder)
 │   ├── easyworship.ts
 │   ├── opensong.ts
-│   └── ...
+│   ├── propresenter.ts
+│   ├── openlp.ts, quelea.ts, songbeamer.ts, chordpro.ts, ...
 │
 ├── values/                 # 📊 Constants
 │   ├── icons.ts
@@ -135,65 +141,79 @@ frontend/
 │   └── ...
 │
 ├── utils/                  # 🛠️  Helper functions
-│   ├── stageTalk.ts        # Stage communication
-│   ├── remoteTalk.ts       # Remote communication
+│   ├── stageTalk.ts        # STAGE server message handlers
+│   ├── remoteTalk.ts       # REMOTE server message handlers
+│   ├── controllerTalk.ts   # CONTROLLER server message handlers
+│   ├── sendData.ts         # Client message routing
+│   ├── receivers.ts        # IPC receive handlers
+│   ├── listeners.ts        # Store subscriptions → broadcasts
+│   ├── request.ts          # send/receive helpers
 │   ├── SocketHelper.ts     # Socket utilities
 │   └── ...
 │
 ├── classes/                # 🏗️  Reusable classes
 ├── show/                   # 📄 Show data utilities
 ├── media/                  # 🎬 Media handling
-├── IPC/                    # 📡 IPC communication
-│   └── main.ts             # IPC helper functions
-│
-└── styles/                 # 🎨 Global styles
-    └── ...
+└── IPC/                    # 📡 IPC communication
+    ├── main.ts             # Typed request/receive helpers
+    └── responsesMain.ts    # Frontend-side IPC handlers
 ```
+
+📝 There is no global `styles/` folder — styling is scoped inside each `.svelte` component, with app-level styles in `App.svelte` and `public/`.
 
 ### Key Frontend Files
 
-| File | Purpose | Lines |
-|------|---------|-------|
-| `main.ts` | Entry point, creates Svelte app | 50 |
-| `App.svelte` | Root component, app initialization | 300 |
-| `MainLayout.svelte` | Three-column layout | 800 |
-| `stores.ts` | Global state management | 1,500 |
-| `components/main/MenuBar.svelte` | Top menu bar | 500 |
-| `components/show/Shows.svelte` | Show list | 400 |
-| `components/edit/EditValues.svelte` | Slide editor | 1,000 |
+| File | Purpose |
+|------|---------|
+| `main.ts` | Entry point, creates the Svelte app |
+| `App.svelte` | Root component, error reporting, window switching |
+| `MainLayout.svelte` | Main UI layout (panels + drawer) |
+| `MainOutput.svelte` | Root component for output windows |
+| `stores.ts` | Global state management (100+ writable stores) |
+| `components/main/MenuBar.svelte` | Top menu bar |
+| `components/show/Slides.svelte` | Slide grid for the active show |
+| `utils/receivers.ts` | Handlers for messages arriving from the main process |
+| `utils/listeners.ts` | Store subscriptions that broadcast state to outputs/servers |
 
 ### Component Organization by Feature
 
-**Show Management:**
+**Show & Project Management:**
 ```
 components/show/
-├── Projects.svelte         # Project list and creation
-├── Shows.svelte            # Show grid/list view
-├── Show.svelte             # Individual show card
-├── ShowDrawers.svelte      # Show-specific drawers
-└── CreateShow.svelte       # Show creation wizard
+├── Projects.svelte         # Project list panel
+├── ProjectList.svelte      # Projects tree
+├── Show.svelte             # Active show view
+├── Slides.svelte           # Slide grid
+├── ShowTools.svelte        # Tools under the slide grid (notes, media, metadata)
+└── Section.svelte          # Project sections
 ```
 
 **Slide Editing:**
 ```
 components/edit/
-├── EditValues.svelte       # Main editor
-├── Items.svelte            # Slide items list
-├── Navigation.svelte       # Slide navigation tree
-└── SlideEditor.svelte      # Slide content editor
+├── Editor.svelte           # Main editor area
+├── Navigation.svelte       # Slide navigation
+├── EditTools.svelte        # Right-hand edit tools
+├── MediaTools.svelte       # Media item tools
+├── editbox/                # The editable slide item box
+├── scripts/                # Edit logic (autosize, text style, ...)
+└── values/                 # Editor input definitions (boxes.ts, ...)
 ```
 
 **Drawer Panels:**
 ```
 components/drawer/
 ├── Drawer.svelte           # Drawer container
-├── Bible.svelte            # Bible search
-├── Audio.svelte            # Audio player
-├── Calendar.svelte         # Calendar events
-├── Live.svelte             # Live streaming
-├── Media.svelte            # Media browser
-├── Effects.svelte          # Visual effects
-└── ...
+├── Content.svelte          # Tab content switcher
+├── Navigation.svelte       # Drawer category navigation
+├── bible/                  # Scripture search & display (Scripture.svelte, ...)
+├── audio/                  # Audio player, playlists, metronome, effects
+├── media/                  # Media browser
+├── calendar/               # Calendar events
+├── live/                   # Cameras, screens, NDI inputs
+├── effects/                # Visual effects
+├── pages/                  # Shows list, search
+└── timers/, player/, info/, navigation/
 ```
 
 ---
@@ -228,10 +248,15 @@ electron/
 │
 ├── data/                   # 💾 Storage & Config
 │   ├── store.ts            # electron-store setup
-│   ├── config.ts           # Configuration management
+│   ├── defaults.ts         # Default store contents
+│   ├── save.ts             # Saving app data to disk
+│   ├── backup.ts           # Backups
+│   ├── import.ts / export.ts  # File import/export
+│   ├── thumbnails.ts       # Media thumbnail generation
+│   ├── downloadMedia.ts    # Media downloads
 │   └── bonjour.ts          # mDNS advertising
 │
-├── cloud/                  # ☁️  Cloud Sync
+├── cloud/                  # ☁️  Cloud Sync (Google Drive + team sync)
 │   └── ...
 │
 ├── ndi/                    # 📡 NDI Support
@@ -243,26 +268,31 @@ electron/
 ├── timecode/               # ⏱️  Timecode (MTC, LTC)
 │   └── ...
 │
-├── contentProviders/       # 🔌 External APIs
-│   ├── Bible.ts            # Bible API integration
-│   ├── Lyrics.ts           # Lyrics search
-│   └── ...
+├── contentProviders/       # 🔌 External content APIs
+│   ├── ContentProviderRegistry.ts
+│   ├── churchApps/, planningCenter/, canva/, amazingLife/
+│   └── base/               # Shared provider types
 │
 └── utils/                  # 🛠️  Utilities
     ├── windowOptions.ts    # Window configuration
-    ├── initialization.ts   # App startup
-    └── menuTemplates.ts    # Application menus
+    ├── init.ts             # App startup helpers
+    ├── menuTemplate.ts     # Application menu
+    ├── files.ts            # File system helpers (large)
+    ├── api.ts              # External API (WebSocket/REST) triggers
+    ├── midi.ts             # MIDI input/output
+    └── shows.ts, keys.ts, updater.ts, spellcheck.ts, ...
 ```
 
 ### Key Electron Files
 
-| File | Purpose | Lines |
-|------|---------|-------|
-| `index.ts` | App lifecycle, window creation | 600 |
-| `preload.ts` | Context bridge API | 200 |
-| `servers.ts` | Socket.io servers | 400 |
-| `IPC/responsesMain.ts` | IPC handlers | 900 |
-| `output/OutputHelper.ts` | Output windows | 500 |
+| File | Purpose |
+|------|---------|
+| `index.ts` | App lifecycle, main window creation |
+| `preload.ts` | Context bridge API (`window.api`) |
+| `servers.ts` | Express + Socket.io servers (REMOTE/STAGE/CONTROLLER/OUTPUT_STREAM) |
+| `IPC/responsesMain.ts` | Map of `Main.*` channels → handler functions |
+| `output/OutputHelper.ts` | Output window facade (helpers in `output/helpers/`) |
+| `utils/files.ts` | File I/O, media lookup, folder scanning |
 
 ### IPC Handler Organization
 
@@ -326,9 +356,8 @@ server/
 │       └── ...
 │
 └── common/                 # 🔗 Shared Utilities
-    ├── messages.ts         # Message type definitions
-    ├── helpers.ts          # Common helper functions
-    └── ...
+    ├── components/         # Shared Svelte components
+    └── util/               # helpers.ts, media.ts, show.ts, style.ts, ...
 ```
 
 ### Server Communication Pattern
@@ -375,79 +404,67 @@ Location: `src/types/`
 ```
 types/
 ├── IPC/                    # IPC Message Types
-│   ├── Main.ts             # Main channel enum (60+ channels)
-│   ├── ToMain.ts           # Frontend → Electron types
-│   └── FromMain.ts         # Electron → Frontend types
+│   ├── Main.ts             # Main channel enum (~129 channels) + typed payloads
+│   └── ToMain.ts           # Electron → Frontend push channels + payloads
 │
-├── Channels.ts             # Channel names (MAIN, REMOTE, STAGE, etc.)
+├── Channels.ts             # Channel names (MAIN, OUTPUT, REMOTE, STAGE, etc.)
 ├── Socket.ts               # Socket.io message types
-├── Show.ts                 # Show/Slide types (16,000 lines!)
-├── Main.ts                 # Main app types (8,000 lines)
+├── Show.ts                 # Show/Slide/Item/Layout types (the core data model)
+├── Main.ts                 # Misc app types
 ├── Output.ts               # Output window types
-├── Settings.ts             # Settings types
+├── Settings.ts             # Settings & theme types
 ├── Stage.ts                # Stage layout types
-├── Media.ts                # Media types
-├── Project.ts              # Project types
-├── Overlay.ts              # Overlay types
-├── Template.ts             # Template types
-├── Theme.ts                # Theme types
+├── Projects.ts             # Project types
 ├── Audio.ts                # Audio types
 ├── Calendar.ts             # Calendar types
-├── Connection.ts           # Connection types
-└── ...
+├── Bible.ts / Scripture.ts # Scripture types
+├── Draw.ts, Effects.ts, History.ts, Input.ts, Save.ts, Tabs.ts, Songbeamer.ts
 ```
 
 ### Key Type Files
 
-**Show.ts** (Most Complex):
+**Show.ts** (Most Important — the core data model):
 ```typescript
 export interface Show {
-  id: string
-  name: string
-  category: string
-  timestamps: {
-    created: number
-    modified: number
-    used: number
-  }
-  settings: ShowSettings
-  slides: Slide[]
-  layouts: Layouts
-  media: MediaShow
-  meta: MetaData
+    name: string
+    category: null | ID
+    settings: {
+        activeLayout: ID
+        template: null | ID
+    }
+    timestamps: { created: number; modified: null | number; used: null | number }
+    meta: { title?: string; artist?: string; CCLI?: string; ... }
+    slides: { [key: ID]: Slide }      // slides are a map, not an array
+    layouts: { [key: ID]: Layout }    // layouts order slides by reference
+    media: { [key: ID]: Media }
 }
 
 export interface Slide {
-  id: string
-  group: string
-  color: string
-  settings: SlideSettings
-  notes: string
-  items: Item[]
-  // ... 50+ more properties
+    group: null | string        // null = child slide
+    color: null | string
+    settings: { template?: string; color?: string; resolution?: Resolution }
+    notes: string
+    items: Item[]               // text boxes, media, timers, ...
+    children?: string[]         // child slide ids
 }
 
-// ... 100+ more interfaces
+// ... many more interfaces (Item, Layout, SlideData, Transition, ...)
 ```
 
-**Main.ts** (IPC Channels):
+**IPC/Main.ts** (IPC Channels):
 ```typescript
 export enum Main {
-  // Storage
-  SHOWS = "SHOWS",
-  PROJECTS = "PROJECTS",
-  SETTINGS = "SETTINGS",
-  
-  // Files
-  IMPORT = "IMPORT",
-  SAVE = "SAVE",
-  DELETE = "DELETE",
-  
-  // Window
-  CLOSE = "CLOSE",
-  MAXIMIZE = "MAXIMIZE",
-  
-  // ... 60+ channels
+    LOG = "LOG",
+    VERSION = "VERSION",
+    IS_DEV = "IS_DEV",
+    SETTINGS = "SETTINGS",
+    SYNCED_SETTINGS = "SYNCED_SETTINGS",
+    SHOWS = "SHOWS",
+    SAVE = "SAVE",
+    IMPORT = "IMPORT",
+    CLOSE = "CLOSE",
+    MAXIMIZE = "MAXIMIZE",
+    // ... ~129 channels, each with typed send/return payloads
 }
 ```
 
@@ -460,18 +477,22 @@ export enum Main {
 ```
 config/typescript/
 ├── tsconfig.electron.json       # Electron main process
-├── tsconfig.electron.prod.json  # Production build
 ├── tsconfig.svelte.json         # Svelte components
 └── tsconfig.server.json         # Server apps
 ```
+
+📝 `tsconfig.*.prod.json` variants are **generated** by `scripts/preBuild.js` during `npm run build` and removed again by `scripts/postBuild.js`.
 
 ### Build Configs
 
 ```
 config/building/
-├── electron-builder.yaml        # Electron packaging
+├── electron-builder.yaml        # Electron packaging (Win/Mac/Linux targets)
 ├── electron-builder-lnxarm.yaml # ARM Linux build
-└── electron-replace-lnxarm.js   # ARM-specific patches
+├── electron-replace-lnxarm.js   # ARM-specific patches
+├── vite.config.servers.mjs      # Vite config for the four server apps
+├── rollup.config.mjs            # Legacy Rollup config (servers)
+└── snapcraft.yaml               # Snap package config
 ```
 
 ### Linting Configs
@@ -515,8 +536,8 @@ export default {
 
 **By Feature:**
 1. Identify the feature (e.g., "Bible search")
-2. Look in `src/frontend/components/drawer/Bible.svelte`
-3. Check related utilities in `src/frontend/utils/`
+2. Look in `src/frontend/components/drawer/bible/Scripture.svelte`
+3. Check related utilities in `src/frontend/utils/` and `components/helpers/`
 
 **By UI Location:**
 - Top menu → `components/main/MenuBar.svelte`
@@ -552,7 +573,7 @@ export default {
 ```
 
 **Global Styles:**
-- `src/frontend/styles/`
+- App-level styles live in `App.svelte` (`:global(...)` rules) and `public/index.html`
 
 ### Finding Constants
 

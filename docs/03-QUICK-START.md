@@ -153,12 +153,14 @@ On first launch, FreeShow will:
 - macOS: `Cmd+Option+I`
 - Windows/Linux: `Ctrl+Shift+I`
 
-**Console should show:**
+**Terminal should show (from the main process):**
 ```
-[FreeShow] App initialized
-[FreeShow] Stores loaded
-[FreeShow] Servers started on ports 5510-5513
+Starting FreeShow...
+Building app! (This may take 20-90 seconds)
+REMOTE on: 5510
+STAGE on: 5511
 ```
+(CONTROLLER and OUTPUT_STREAM are disabled by default and start when enabled in Settings → Connection.)
 
 ### 3. Create Your First Show
 
@@ -348,13 +350,9 @@ npm start
 ```bash
 # Force production mode (uses built files, not Vite)
 NODE_ENV=production npm start
-
-# Enable verbose logging
-DEBUG=* npm start
-
-# Custom port for Vite (if 3000 is taken)
-PORT=3001 npm start
 ```
+
+📝 The Vite dev server port is fixed at **3000** (`vite.config.mjs`), and `scripts/start.js` clears that port automatically on startup (`npx kill-port 3000`).
 
 ### Build Configuration
 
@@ -443,27 +441,33 @@ After running the app for the first time:
 
 ```
 FreeShow/
-├── build/                   # Compiled code
-│   ├── electron/            # ✓ Created
-│   ├── remote/              # ✓ Created
-│   ├── stage/               # ✓ Created
-│   └── controller/          # ✓ Created
+├── build/                          # Compiled code
+│   └── electron/                   # ✓ Compiled main process
+│       ├── remote/                 # ✓ Remote server bundle
+│       ├── stage/                  # ✓ Stage server bundle
+│       ├── controller/             # ✓ Controller server bundle
+│       └── output_stream/          # ✓ Output stream server bundle
 │
-├── public/build/            # Frontend bundle
-│   ├── bundle.js            # ✓ Created (dev mode uses Vite)
-│   └── bundle.css           # ✓ Created
-│
-└── User Data Directory      # Platform-specific
-    ├── config.json          # ✓ App settings
-    ├── shows/               # ✓ Show files
-    ├── cache/               # ✓ Thumbnails, etc.
-    └── logs/                # ✓ Error logs
+├── public/build/                   # Frontend bundle (production builds)
+│   ├── bundle.js                   # ✓ Created by `vite build` (dev mode serves from Vite instead)
+│   └── bundle.css                  # ✓ Created
 ```
 
-**User Data Locations:**
+**App config (electron-store JSON files):**
 - **Windows:** `%APPDATA%/freeshow/`
 - **macOS:** `~/Library/Application Support/freeshow/`
 - **Linux:** `~/.config/freeshow/`
+
+Contains `config.json`, `settings.json`, `shows.json` (trimmed show index), `cache.json`, `media.json`, `history.json`, ...
+
+**User data (chosen "Data location", default `Documents/FreeShow/`):**
+```
+Documents/FreeShow/
+├── Shows/               # Individual .show files (JSON)
+├── Media/               # Media sync folder
+├── Config/              # settings_synced.json, profiles, themes
+└── Exports/, Recordings/, ...
+```
 
 ---
 
@@ -479,8 +483,8 @@ npm list --depth=0
 
 ✅ **Build directories exist:**
 ```bash
-ls build/
-# Should show: electron/ remote/ stage/ controller/
+ls build/electron/
+# Should show compiled .js files plus: remote/ stage/ controller/ output_stream/
 ```
 
 ✅ **Electron launches:**

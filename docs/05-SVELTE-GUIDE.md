@@ -768,24 +768,21 @@ Location: `src/frontend/stores.ts`
   import { showsCache } from '../stores'
   
   let loading = true
-  let error = null
+  let error = false
   
   onMount(async () => {
-    try {
-      const shows = await requestMain(Main.SHOWS, {})
-      showsCache.set(shows)
-    } catch (err) {
-      error = err.message
-    } finally {
-      loading = false
-    }
+    // ⚠️ requestMain resolves `undefined` on timeout — it does not throw
+    const shows = await requestMain(Main.SHOWS)
+    if (shows) showsCache.set(shows)
+    else error = true
+    loading = false
   })
 </script>
 
 {#if loading}
   <div class="loader">Loading...</div>
 {:else if error}
-  <div class="error">{error}</div>
+  <div class="error">Could not load shows</div>
 {:else}
   <!-- Content -->
 {/if}
@@ -793,26 +790,32 @@ Location: `src/frontend/stores.ts`
 
 ### Pattern 2: Reactive Updates to Stage
 
+📝 In FreeShow, broadcasting state to output windows and web clients is centralized in `src/frontend/utils/listeners.ts` — store subscriptions rather than per-component reactive statements:
+
+```typescript
+// src/frontend/utils/listeners.ts (simplified)
+import { OUTPUT, STAGE } from "../../types/Channels"
+import { send } from "./request"
+import { sendData } from "./sendData"
+
+outputs.subscribe(async (data) => {
+    // debounce rapid updates
+    if (await hasNewerUpdate("LISTENER_OUTPUTS", 1)) return
+
+    send(OUTPUT, ["OUTPUTS"], data)         // → output windows (IPC)
+    sendData(STAGE, { channel: "OUT" })     // → StageShow clients (Socket.io)
+})
+```
+
+If a component needs to push something itself, it uses the same helper:
+
 ```svelte
 <script lang="ts">
-  import { outputs } from '../stores'
-  import { send } from '../utils/stageTalk'
-  
-  // Watch for output changes and send to stage
-  $: if ($outputs) {
-    sendToStage($outputs)
-  }
-  
-  function sendToStage(outputs) {
-    Object.entries(outputs).forEach(([id, output]) => {
-      if (output.enabled) {
-        send('OUTPUT', {
-          id,
-          background: output.background,
-          slide: output.slide
-        })
-      }
-    })
+  import { STAGE } from "../../types/Channels"
+  import { send } from "../utils/request"
+
+  function updateStage(data) {
+    send(STAGE, ["BACKGROUND"], data)
   }
 </script>
 ```
